@@ -3,14 +3,14 @@ package top.zymnb.util;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import org.apache.commons.io.IOUtils;
-import top.zymnb.util.HttpUtil;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -18,6 +18,8 @@ import java.util.Map;
  * @author zym
  */
 public class DownloadUtil {
+
+    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
     public static  String BASE_DIR = "";
 
@@ -102,6 +104,10 @@ public class DownloadUtil {
             String fileId = entryFileFileEntry.getString("id");
             String fileName = entryFileFileEntry.getString("name");
             String version = entryFileFileEntry.getString("version");
+            // 秒
+            long createDateLong = entryFileFileEntry.getLongValue("createTimeForSort");
+            // 转化为毫秒
+            Date createDate = new Date(createDateLong * 1000);
             if (isDir){
                 // 先创建目录
                 File dir = new File(parentDir.getAbsolutePath()+"/"+fileName);
@@ -111,13 +117,15 @@ public class DownloadUtil {
                 JSONArray fileArr = getFileEntries(fileId);
                 fileToWord(fileArr,dir);
             }else {
-                buildWordFile(fileId,fileName,parentDir,version);
+                synchronized ("1"){
+                    buildWordFile(fileId,fileName,parentDir,version,DATE_FORMAT.format(createDate));
+                }
             }
         }
 
     }
 
-    public static void buildWordFile(String fileId,String fileName,File parentFile,String version){
+    public static void buildWordFile(String fileId,String fileName,File parentFile,String version,String createDate){
         String url = "https://note.youdao.com/ydoc/api/personal/doc?method=download-docx&fileId="+fileId+"&cstk="+CSTK+"&keyfrom=web&sev=j1";
 
         if (fileName.toLowerCase().endsWith(".note")){
@@ -126,7 +134,7 @@ public class DownloadUtil {
             url = "https://note.youdao.com/yws/api/personal/sync?method=download&fileId="+fileId+"&version="+version+"&cstk="+CSTK+"&keyfrom=web&sev=j1";
         }
 
-        String filePath = parentFile.getAbsolutePath()+"/"+fileName;
+        String filePath = parentFile.getAbsolutePath()+"/"+createDate+"-"+fileName;
 
         File file = new File(filePath);
         try (InputStream is = HttpUtil.downloadGetSSL(url, requestProperty); FileOutputStream fos = new FileOutputStream(file)) {
